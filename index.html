@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Consulta de Precios – Gano / Luvoco</title>
+
+	<!--  Apple-like minimal styling  -->
+	<style>
+		:root{
+			--bg:#f5f5f7;--card:#ffffff;--accent:#0071e3;
+			--radius:18px;--shadow:0 10px 20px rgba(0,0,0,.06)
+		}
+		*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+		body{background:var(--bg);color:#1d1d1f;display:flex;min-height:100vh;align-items:flex-start;justify-content:center;padding:60px 16px}
+		h1{font-size:32px;margin-bottom:32px;font-weight:600;text-align:center}
+
+		/* buscador */
+		.search-box{max-width:560px;width:100%;background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);display:flex;padding:8px 12px;align-items:center;transition:box-shadow .25s}
+		.search-box:focus-within{box-shadow:0 12px 24px rgba(0,0,0,.12)}
+		.search-box input{border:none;flex:1;font-size:18px;padding:14px 12px;background:transparent;outline:none}
+		.search-box button{background:var(--accent);color:#fff;border:none;border-radius:12px;padding:10px 18px;font-size:16px;cursor:pointer;transition:background .25s,transform .25s}
+		.search-box button:hover{background:#1284ff;transform:translateY(-1px)}
+
+		/* tarjeta resultados */
+		#result-card{opacity:0;transform:translateY(25px);pointer-events:none;margin-top:40px;max-width:720px;width:100%;background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);transition:opacity .35s,transform .35s}
+		#result-card.show{opacity:1;transform:translateY(0);pointer-events:auto}
+
+		table{width:100%;border-collapse:collapse}
+		th,td{padding:16px 20px;text-align:left;border-bottom:1px solid #e5e5e5}
+		th{background:#fafafa;font-weight:600}
+
+		/* miniaturas */
+		.thumbnail{width:54px;height:54px;object-fit:cover;border-radius:12px;margin-right:14px;box-shadow:0 4px 8px rgba(0,0,0,.08)}
+		.prod-cell{display:flex;align-items:center}
+
+		@media(max-width:560px){
+			th,td{padding:12px 14px;font-size:14px}
+			h1{font-size:26px}
+		}
+	</style>
+</head>
+
+<body>
+<main>
+	<h1>Consulta de Precios</h1>
+
+	<form id="searchForm" class="search-box" autocomplete="off">
+		<input type="text" id="query" placeholder="Escribe el nombre del producto…" required />
+		<button type="submit">Buscar</button>
+	</form>
+
+	<section id="result-card">
+		<table>
+			<thead>
+				<tr>
+					<th>Producto</th>
+					<th>Preferente</th>
+					<th>Público</th>
+					<th>PV</th>
+					<th>CV</th>
+				</tr>
+			</thead>
+			<tbody id="result-body"></tbody>
+		</table>
+	</section>
+</main>
+
+<script>
+/* Dataset con imágenes .png en /static/assets/ */
+const productos = [
+  { nombre:"Gano Soap", img:"/static/assets/gano-soap.png", preferente:73900, publico:96900, pv:10.4, cv:8.9 },
+  { nombre:"Gano Fresh Toothpaste", img:"/static/assets/gano-fresh-toothpaste.png", preferente:73900, publico:96900, pv:11.0, cv:9.5 },
+  { nombre:"Gano Transparent Soap", img:"/static/assets/gano-transparent-soap.png", preferente:78500, publico:101500, pv:12.0, cv:10.0 },
+  { nombre:"Piel8Brillo Shampoo", img:"/static/assets/piel8brillo-shampoo.png", preferente:73900, publico:96900, pv:11.0, cv:9.0 },
+  { nombre:"Piel8Brillo Acondicionador", img:"/static/assets/piel8brillo-acondicionador.png", preferente:73900, publico:96900, pv:11.0, cv:9.0 },
+  { nombre:"Piel8Brillo Exfoliante Corporal", img:"/static/assets/piel8brillo-exfoliante-corporal.png", preferente:73900, publico:96900, pv:11.0, cv:9.0 },
+  { nombre:"Piel8Brillo Shampoo & Acondicionador", img:"/static/assets/piel8brillo-shampoo-acondicionador.png", preferente:143000, publico:189500, pv:22.0, cv:18.0 },
+  { nombre:"Piel8Brillo Shampoo & Acondicionador & Exfoliante Corporal", img:"/static/assets/piel8brillo-trio.png", preferente:212500, publico:276900, pv:33.0, cv:27.0 },
+  { nombre:"Ganocafe 3 en 1", img:"/static/assets/ganocafe-3en1.png", preferente:110900, publico:147900, pv:15.0, cv:14.0 },
+  { nombre:"Gano Schokolade", img:"/static/assets/gano-schokolade.png", preferente:124900, publico:166500, pv:17.0, cv:15.6 },
+  { nombre:"Ganorico Mocha Rico", img:"/static/assets/ganorico-mocha-rico.png", preferente:119900, publico:156900, pv:17.0, cv:15.0 },
+  { nombre:"Oleaf Gano Rooibos Drink", img:"/static/assets/oleaf-gano-rooibos-drink.png", preferente:119900, publico:156900, pv:17.0, cv:15.0 },
+  { nombre:"Ganocafe Classic", img:"/static/assets/ganocafe-classic.png", preferente:110900, publico:147900, pv:15.0, cv:14.0 },
+  { nombre:"Gano C'Real Spirulina", img:"/static/assets/gano-creal-spirulina.png", preferente:119900, publico:156900, pv:17.0, cv:15.0 },
+  { nombre:"Ganorico Latte Rico", img:"/static/assets/ganorico-latte-rico.png", preferente:119900, publico:156900, pv:17.0, cv:15.0 },
+  { nombre:"Ganorico Shoko Rico", img:"/static/assets/ganorico-shoko-rico.png", preferente:124900, publico:166500, pv:17.0, cv:15.6 },
+  { nombre:"Reskine Collagen Drink", img:"/static/assets/reskine-collagen-drink.png", preferente:216900, publico:276900, pv:31.0, cv:27.6 },
+  { nombre:"Ganoderma Capsulas", img:"/static/assets/ganoderma-capsulas.png", preferente:272500, publico:332500, pv:41.0, cv:34.5 },
+  { nombre:"Excellium Capsulas", img:"/static/assets/excellium-capsulas.png", preferente:272500, publico:332500, pv:41.0, cv:34.5 },
+  { nombre:"CordyGold Capsulas", img:"/static/assets/cordygold-capsulas.png", preferente:336900, publico:424500, pv:49.0, cv:43.0 },
+  { nombre:"LUVOCÓ Suave", img:"/static/assets/luvoco-suave.png", preferente:110900, publico:147900, pv:15.0, cv:14.0 },
+  { nombre:"LUVOCÓ Medio", img:"/static/assets/luvoco-medio.png", preferente:110900, publico:147900, pv:15.0, cv:14.0 },
+  { nombre:"LUVOCÓ Fuerte", img:"/static/assets/luvoco-fuerte.png", preferente:110900, publico:147900, pv:15.0, cv:14.0 }
+];
+
+/* Formateo de pesos */
+const pesos = n => n.toLocaleString("es-CO",{style:"currency",currency:"COP",minimumFractionDigits:0});
+
+/* Render */
+const form  = document.getElementById("searchForm");
+const body  = document.getElementById("result-body");
+const card  = document.getElementById("result-card");
+
+form.addEventListener("submit", e=>{
+	e.preventDefault();
+	const q = document.getElementById("query").value.trim().toLowerCase();
+	body.innerHTML="";
+	card.classList.remove("show");
+	if(!q) return;
+
+	const encontrados = productos.filter(p=>p.nombre.toLowerCase().includes(q));
+
+	if(encontrados.length){
+		encontrados.forEach(p=>{
+			body.insertAdjacentHTML("beforeend",`
+				<tr>
+					<td class="prod-cell">
+						<img src="${p.img}" alt="${p.nombre}" class="thumbnail">
+						<span>${p.nombre}</span>
+					</td>
+					<td>${pesos(p.preferente)}</td>
+					<td>${pesos(p.publico)}</td>
+					<td>${p.pv.toFixed(1)}</td>
+					<td>${p.cv.toFixed(1)}</td>
+				</tr>`);
+		});
+	}else{
+		body.innerHTML='<tr><td colspan="5" style="padding:28px 20px;">Producto no encontrado.</td></tr>';
+	}
+	card.classList.add("show");
+});
+</script>
+</body>
+</html>
+
